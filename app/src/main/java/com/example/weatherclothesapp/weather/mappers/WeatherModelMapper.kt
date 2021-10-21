@@ -1,4 +1,7 @@
-package com.example.weatherclothesapp.weather.simple_objects
+package com.example.weatherclothesapp.weather.mappers
+
+import com.example.weatherclothesapp.weather.simple_objects.local.WeatherModel
+import com.example.weatherclothesapp.weather.simple_objects.web.ResponseDto
 
 object WeatherModelMapper {
 

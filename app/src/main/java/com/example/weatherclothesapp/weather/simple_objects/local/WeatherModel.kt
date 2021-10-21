@@ -1,4 +1,4 @@
-package com.example.weatherclothesapp.weather.simple_objects
+package com.example.weatherclothesapp.weather.simple_objects.local
 
 class WeatherModel(
     val location: Location,

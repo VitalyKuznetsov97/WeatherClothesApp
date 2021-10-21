@@ -58,6 +58,11 @@ dependencies {
     implementation "com.google.code.gson:gson:$gson"
     implementation "com.squareup.retrofit2:converter-gson:$gsonConverter"
 
+    //Room
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    annotationProcessor "androidx.room:room-compiler:$roomVersion"
+
     //Unit tests
     testImplementation "junit:junit:$junitVersion"
 

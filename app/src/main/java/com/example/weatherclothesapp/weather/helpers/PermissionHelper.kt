@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.pm.PackageManager
 import androidx.activity.result.ActivityResultLauncher
 import androidx.core.content.ContextCompat
-import com.example.weatherclothesapp.weather.Constants
+import com.example.weatherclothesapp.weather.constants.Constants
 
 class PermissionHelper(
     private val activityResultLauncher: ActivityResultLauncher<String>
