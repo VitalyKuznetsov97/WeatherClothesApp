@@ -1,6 +1,6 @@
 package com.example.weatherclothesapp.weather.helpers
 
-import com.example.weatherclothesapp.weather.simple_objects.ResponseDto
+import com.example.weatherclothesapp.weather.simple_objects.web.ResponseDto
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response

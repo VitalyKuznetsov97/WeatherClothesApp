@@ -7,25 +7,18 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.example.weatherclothesapp.R
-import com.example.weatherclothesapp.weather.Constants.CURRENT_LOCATION_ERROR
-import com.example.weatherclothesapp.weather.Constants.EXPECTED_INFO_TYPE_KEY
-import com.example.weatherclothesapp.weather.Constants.IS_LOADING_KEY
-import com.example.weatherclothesapp.weather.Constants.IS_SHOWING_RATIONALE_KEY
-import com.example.weatherclothesapp.weather.Constants.LAST_LOCATION_ERROR
-import com.example.weatherclothesapp.weather.Constants.LOCATION_KEY
-import com.example.weatherclothesapp.weather.Constants.LOCATION_PERMISSION_DENIED_TEXT
-import com.example.weatherclothesapp.weather.Constants.LOCATION_PERMISSION_RATIONALE_TEXT
-import com.example.weatherclothesapp.weather.Constants.TEXT_KEY
-import com.example.weatherclothesapp.weather.Constants.WEATHER_FORECAST_ERROR
+import com.example.weatherclothesapp.weather.constants.Constants
 import com.example.weatherclothesapp.weather.helpers.LocationHelper
 import com.example.weatherclothesapp.weather.helpers.PermissionHelper
 import com.example.weatherclothesapp.weather.helpers.PredictionHelper
 import com.example.weatherclothesapp.weather.helpers.WeatherApiHelper
-import com.example.weatherclothesapp.weather.simple_objects.PredictionModel
-import com.example.weatherclothesapp.weather.simple_objects.ResponseDto
-import com.example.weatherclothesapp.weather.simple_objects.WeatherModel
-import com.example.weatherclothesapp.weather.simple_objects.WeatherModelMapper
+import com.example.weatherclothesapp.weather.mappers.WeatherModelMapper
+import com.example.weatherclothesapp.weather.simple_objects.local.PredictionModel
+import com.example.weatherclothesapp.weather.simple_objects.local.WeatherModel
+import com.example.weatherclothesapp.weather.simple_objects.web.ResponseDto
+import com.example.weatherclothesapp.weather.storage.StorageHelper
 import com.google.android.gms.location.LocationServices
+import java.util.*
 
 class WeatherActivity : AppCompatActivity() {
 
@@ -39,6 +32,7 @@ class WeatherActivity : AppCompatActivity() {
     private lateinit var permissionHelper: PermissionHelper
     private lateinit var weatherApiHelper: WeatherApiHelper
     private lateinit var predictionHelper: PredictionHelper
+    private lateinit var storageHelper: StorageHelper
 
     //Data
     private var text: String = ""
@@ -92,35 +86,44 @@ class WeatherActivity : AppCompatActivity() {
         permissionHelper = PermissionHelper(activityResultLauncher)
         weatherApiHelper = WeatherApiHelper()
         predictionHelper = PredictionHelper()
+        storageHelper = StorageHelper()
+
+        //Creation callback
+        if (savedInstanceState == null) {
+            onActivityFirstCreated()
+        }
     }
 
     //Restore ui state
     override fun onResume() {
         super.onResume()
         updateUi()
+
+
     }
 
     //Save data
     override fun onSaveInstanceState(outState: Bundle) {
-        outState.putString(TEXT_KEY, text)
-        outState.putSerializable(LOCATION_KEY, location)
-        outState.putInt(EXPECTED_INFO_TYPE_KEY, expectedInfoType.ordinal)
-        outState.putBoolean(IS_SHOWING_RATIONALE_KEY, isShowingRationale)
-        outState.putBoolean(IS_LOADING_KEY, isLoading)
+        outState.putString(Constants.TEXT_KEY, text)
+        outState.putSerializable(Constants.LOCATION_KEY, location)
+        outState.putInt(Constants.EXPECTED_INFO_TYPE_KEY, expectedInfoType.ordinal)
+        outState.putBoolean(Constants.IS_SHOWING_RATIONALE_KEY, isShowingRationale)
+        outState.putBoolean(Constants.IS_LOADING_KEY, isLoading)
         super.onSaveInstanceState(outState)
     }
 
     //Restore data
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         super.onRestoreInstanceState(savedInstanceState)
-        text = savedInstanceState.getString(TEXT_KEY, "")
+        text = savedInstanceState.getString(Constants.TEXT_KEY, "")
         expectedInfoType = savedInstanceState
-            .getInt(EXPECTED_INFO_TYPE_KEY, 0)
+            .getInt(Constants.EXPECTED_INFO_TYPE_KEY, 0)
             .toExpectedInfoType()
-        isLoading = savedInstanceState.getBoolean(IS_LOADING_KEY, false)
-        isShowingRationale = savedInstanceState.getBoolean(IS_SHOWING_RATIONALE_KEY, false)
+        isLoading = savedInstanceState.getBoolean(Constants.IS_LOADING_KEY, false)
+        isShowingRationale =
+            savedInstanceState.getBoolean(Constants.IS_SHOWING_RATIONALE_KEY, false)
 
-        val locationSerializable = savedInstanceState.getSerializable(LOCATION_KEY)
+        val locationSerializable = savedInstanceState.getSerializable(Constants.LOCATION_KEY)
         if (locationSerializable is Pair<*, *>) {
             val first = locationSerializable.first
             val second = locationSerializable.second
@@ -128,6 +131,7 @@ class WeatherActivity : AppCompatActivity() {
             if (first is Double && second is Double) {
                 location = Pair(first, second)
             }
+
         }
     }
 
@@ -162,11 +166,7 @@ class WeatherActivity : AppCompatActivity() {
 
         updateUi()
 
-        weatherApiHelper.makeWeatherRequest(
-            location,
-            { responseDto -> onForecastRequestSuccess(responseDto) },
-            { onForecastRequestFailure() }
-        )
+        onWeatherForecastRequested()
     }
 
     private fun onPredictionClicked() {
@@ -177,11 +177,7 @@ class WeatherActivity : AppCompatActivity() {
 
         updateUi()
 
-        weatherApiHelper.makeWeatherRequest(
-            location,
-            { responseDto -> onForecastRequestSuccess(responseDto) },
-            { onForecastRequestFailure() }
-        )
+        onWeatherForecastRequested()
     }
 
     //Location request callbacks
@@ -210,7 +206,7 @@ class WeatherActivity : AppCompatActivity() {
     private fun onLocationPermissionDenied() {
         isLoading = false
         isShowingRationale = false
-        text = LOCATION_PERMISSION_DENIED_TEXT
+        text = Constants.LOCATION_PERMISSION_DENIED_TEXT
 
         updateUi()
     }
@@ -219,7 +215,7 @@ class WeatherActivity : AppCompatActivity() {
     private fun onLocationPermissionRationaleRequested() {
         isLoading = false
         isShowingRationale = true
-        text = LOCATION_PERMISSION_RATIONALE_TEXT
+        text = Constants.LOCATION_PERMISSION_RATIONALE_TEXT
 
         updateUi()
     }
@@ -239,7 +235,7 @@ class WeatherActivity : AppCompatActivity() {
         val weatherModel = WeatherModelMapper.fromResponseDto(responseDto)
 
         if (expectedInfoType == ExpectedInfoType.Prediction) {
-            makePrediction(weatherModel)
+            onForecastReady(weatherModel)
             return
         }
 
@@ -253,21 +249,35 @@ class WeatherActivity : AppCompatActivity() {
     private fun onForecastRequestFailure() {
         isLoading = false
         isShowingRationale = false
-        text = WEATHER_FORECAST_ERROR
+        text = Constants.WEATHER_FORECAST_ERROR
 
         updateUi()
     }
 
     //Prediction callbacks
-    private fun onPredictionReady(predictionModel: PredictionModel) {
+    private fun onForecastReady(weatherModel: WeatherModel) {
+        val predictionModel = predictionHelper.createPrediction(0, weatherModel)
+
         isLoading = false
         isShowingRationale = false
-        text = predictionModel.predictionText
+        text = predictionModel.text
 
         updateUi()
     }
 
-    //Location support methods
+    //First time activity creation callbacks
+    private fun onActivityFirstCreated() {
+        val lastPrediction = storageHelper.getPrediction(this, 0)
+
+        expectedInfoType = ExpectedInfoType.Prediction
+        isLoading = false
+        isShowingRationale = false
+        text = getLastPredictionText(lastPrediction)
+
+        updateUi()
+    }
+
+    //Support methods
     private fun onLocationRequested() {
         if (permissionHelper.hasLocationPermission(this)) {
             //Has permission
@@ -281,13 +291,21 @@ class WeatherActivity : AppCompatActivity() {
         }
     }
 
+    private fun onWeatherForecastRequested() {
+        weatherApiHelper.makeWeatherRequest(
+            location,
+            { responseDto -> onForecastRequestSuccess(responseDto) },
+            { onForecastRequestFailure() }
+        )
+    }
+
     private fun getLocation() {
         when (expectedInfoType) {
             ExpectedInfoType.LastLocation -> {
                 locationHelper.getLastLocation { location ->
                     when {
                         location != null -> onLocationRequestSuccess(location)
-                        else -> onLocationRequestFailure(LAST_LOCATION_ERROR)
+                        else -> onLocationRequestFailure(Constants.LAST_LOCATION_ERROR)
                     }
                 }
             }
@@ -295,7 +313,7 @@ class WeatherActivity : AppCompatActivity() {
                 locationHelper.getCurrentLocation { location ->
                     when {
                         location != null -> onLocationRequestSuccess(location)
-                        else -> onLocationRequestFailure(CURRENT_LOCATION_ERROR)
+                        else -> onLocationRequestFailure(Constants.CURRENT_LOCATION_ERROR)
                     }
                 }
             }
@@ -305,12 +323,19 @@ class WeatherActivity : AppCompatActivity() {
         }
     }
 
-    private fun makePrediction(weatherModel: WeatherModel) {
-        val predictionModel = predictionHelper.getPrediction(
-            weatherModel
-        )
+    private fun getLastPredictionText(lastPrediction: PredictionModel?): String {
+        return if (lastPrediction == null) {
+            Constants.NO_SAVED_PREDICTIONS_TEXT
+        } else {
+            val diff = Date().time - lastPrediction.timestamp
+            val hours = diff / (1000 * 60 * 60)
+            val minutes = (diff / (1000 * 60)) % 60
+            val seconds = (diff / (1000 * 60)) % 60
 
-        onPredictionReady(predictionModel)
+
+            "Last prediction: " + lastPrediction.text + '\n' +
+                    "Last prediction was made " + hours + " hours " + minutes + " minutes " + seconds + " seconds ago"
+        }
     }
 
     //UI
@@ -321,7 +346,7 @@ class WeatherActivity : AppCompatActivity() {
         acceptRationaleButton.visibility = if (isShowingRationale) View.VISIBLE else View.GONE
     }
 
-    //Ui state
+    //UI state
     private enum class ExpectedInfoType {
         LastLocation,
         CurrentLocation,
